@@ -1,4 +1,4 @@
-from core.menu import Menu
+from chess.menu import Menu
 import tkinter as tk
 LARGE_FONT= ("Verdana", 12)
 

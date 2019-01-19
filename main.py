@@ -1,5 +1,5 @@
-import core.board as board
-import core.gui as gui
+import chess.board as board
+import chess.gui as gui
 
 if __name__ == "__main__":
     board = board.Board()

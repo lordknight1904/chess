@@ -141,39 +141,9 @@ class Game(tk.Frame):
         self.statusbar.pack(expand=True, fill="x", side='bottom')
 
         self.refresh()
-        self.draw_pieces()
+        # self.draw_pieces()
 
-    def draw_pieces(self):
-        self.canvas.delete("piece")
-        for coord, piece in self.controller.chessboard.items():
-            x, y = self.controller.chessboard.number_notation(coord)
-            # print("{}: {}, {}".format(coord, x, y))
-            if piece is not None:
-                filename = "img/{}{}.png".format(piece.color, piece.abbreviation.lower())
-                piece_name = "{}{}{}".format(piece.abbreviation, x, y)
-
-                if filename not in self.icons:
-                    self.icons[filename] = ImageTk.PhotoImage(file=filename, width=32, height=32)
-
-                self.add_piece(piece_name, self.icons[filename], x, y)
-
-                # self.place_piece(piece_name, x, y)
-
-    def add_piece(self, name, image, row=0, column=0):
-        # Add a piece to the playing board
-        self.canvas.create_image(0, 0, image=image, tags=(name, "piece"), anchor="c")
-        self.place_piece(name, row, column)
-
-    def place_piece(self, name, row, column):
-        # Place a piece at the given row/column
-        self.pieces[name] = (row, column)
-        square_size = self.controller.square_size
-        x0 = (row * square_size) + int(square_size/2)
-        y0 = (column * square_size) + int(square_size/2)
-        self.canvas.coords(name, x0, y0)
-
-    def reset(self):
-        print('reset')
+    def reset(self): pass
 
     def move(self, p1, p2):
         # print("{} -> {}".format(p1, p2))
@@ -182,10 +152,11 @@ class Game(tk.Frame):
         if dest_piece is None or dest_piece.color != piece.color:
             self.controller.chessboard.move(p1,p2)
 
-    def refresh(self, event={}):
-        self.canvas.delete("square")
+    def refresh(self):
         color = self.color2
 
+        # draw the board
+        self.canvas.delete("square")
         for row in range(self.controller.rows):
             color = self.color1 if color == self.color2 else self.color2
             for col in range(self.controller.columns):
@@ -194,6 +165,7 @@ class Game(tk.Frame):
                 x2 = x1 + self.controller.square_size
                 y2 = y1 + self.controller.square_size
 
+                # highlight square
                 if (self.selected is not None) and (row, col) == self.selected:
                     self.canvas.create_rectangle(x1, y1, x2, y2, outline="black", fill="orange", tags="square")
                 else:
@@ -202,20 +174,43 @@ class Game(tk.Frame):
                     else:
                         self.canvas.create_rectangle(x1, y1, x2, y2, outline="black", fill=color, tags="square")
                 color = self.color1 if color == self.color2 else self.color2
-        for name in self.pieces:
-            self.place_piece(name, self.pieces[name][0], self.pieces[name][1])
+
+        # draw pieces
+        self.canvas.delete("piece")
+        for coord, piece in self.controller.chessboard.items():
+            x, y = self.controller.chessboard.number_position(coord)
+            # print("{}: {}, {}".format(coord, x, y))
+            if piece is not None:
+                filename = "img/{}{}.png".format(piece.color, piece.abbreviation.lower())
+                piece_name = "{}{}{}".format(piece.abbreviation, x, y)
+
+                if filename not in self.icons:
+                    self.icons[filename] = ImageTk.PhotoImage(file=filename, width=32, height=32)
+
+                self.canvas.create_image(0, 0, image=self.icons[filename], tags=(piece_name, "piece"), anchor="c")
+                square_size = self.controller.square_size
+                x0 = (x * square_size) + int(square_size/2)
+                y0 = (y * square_size) + int(square_size/2)
+                self.canvas.coords(piece_name, x0, y0)
+
         self.canvas.tag_raise("piece")
         self.canvas.tag_lower("square")
 
-    def callback(self, event):
-        col_size = row_size = self.controller.square_size
+        state = self.controller.chessboard.get_state()
+        if state[0]:
+            self.label_status['text'] = state[1].capitalize() + " win."
 
-        current_column = event.x // col_size
-        current_row = event.y // row_size
+    def callback(self, event):
+        state = self.controller.chessboard.get_state()
+        if state[0]:
+            return
+
+        current_column = event.x // self.controller.square_size
+        current_row = event.y // self.controller.square_size
 
         position = self.controller.chessboard.letter_notation((current_column, current_row))
         piece = self.controller.chessboard[position]
-        print("{}:{} {}, {}".format(position, piece.abbreviation if piece is not None else '?', current_column, current_row))
+        # print("{}:{} {}, {}".format(position, piece.abbreviation if piece is not None else '?', current_column, current_row))
 
         skip = False
         if self.selected_piece:
@@ -223,7 +218,6 @@ class Game(tk.Frame):
             self.selected_piece = None
             self.highlighted = None
             self.pieces = {}
-            self.draw_pieces()
             skip = True
 
         if piece is not None and not skip:
@@ -232,11 +226,8 @@ class Game(tk.Frame):
 
     def highlight(self, pos, piece):
         if piece is not None and (piece.color == self.controller.chessboard.player_turn):
-            # print("{}: {}".format(pos, piece.abbreviation))
             self.selected_piece = (self.controller.chessboard[pos], pos)
-            self.highlighted = list(map(self.controller.chessboard.number_notation,
+            self.highlighted = list(map(self.controller.chessboard.number_position,
                                         (self.controller.chessboard[pos].possible_moves(pos))
                                         )
                                     )
-            # self.highlighted = self.controller.chessboard[pos].possible_moves(pos)
-            # print(self.highlighted)

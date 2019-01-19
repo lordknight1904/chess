@@ -1,5 +1,5 @@
 import tkinter as tk
-from core.game import Game
+from chess.game import Game
 LARGE_FONT= ("Verdana", 12)
 
 

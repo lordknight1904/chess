@@ -13,7 +13,8 @@ ABBREVIATIONS = {
 
 # Takes a piece name or abbreviation and returns the corresponding piece instance
 def piece(piece, board, color='white'):
-    if piece in (None, ' '): return
+    if piece in (None, ' '):
+        return
     if len(piece) == 1:
         # We have an abbreviation
         if piece.isupper():
@@ -78,7 +79,6 @@ class Pawn(Piece):
     abbreviation = 'p'
     def possible_moves(self, position):
         board = self.board
-        piece = self
         if self.color == 'white':
             homerow, direction, enemy = 6, -1, 'black'
         else:
@@ -102,10 +102,10 @@ class Pawn(Piece):
                     legal_moves.append(double_forward)
 
         # Attacking
-        # for a in range(-1, 2, 2):
-        #     attack = from_[0] + direction, from_[1] + a
-        #     if board.letter_notation(attack) in board.occupied(enemy):
-        #         legal_moves.append(attack)
+        for a in range(-1, 1):
+            attack = from_[0] + a, from_[1] + direction
+            if board.letter_notation(attack) in board.occupied(enemy):
+                legal_moves.append(attack)
 
         # TODO: En passant
         # legal_moves = filter(board.is_in_bounds, legal_moves)

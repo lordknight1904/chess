@@ -1,11 +1,11 @@
-import core.pieces as pieces
+import chess.pieces as pieces
 import re
 from copy import deepcopy
 
 # FEN_STARTING = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-# FEN_STARTING = 'RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1'
+FEN_STARTING = 'RNBQKBNR/PPPPPPPP/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1'
 # FEN_STARTING = 'RNBQKBNR/8/8/8/8/8/pppppppp/rnbqkbnr w KQkq - 0 1'
-FEN_STARTING = 'RNBQKBNR/8/8/8/8/8/8/6k w KQkq - 0 1'
+# FEN_STARTING = 'RNBQKBNR/8/8/8/8/8/8/6k w KQkq - 0 1'
 RANK_REGEX = re.compile(r"^[A-Z][1-8]$")
 
 
@@ -23,6 +23,9 @@ class Board(dict):
     history = []
     winner = None
     is_end = False
+
+    def get_state(self):
+        return self.is_end, self.winner, self.player_turn
 
     def __init__(self, fen=None):
         dict.__init__(self)
@@ -44,10 +47,8 @@ class Board(dict):
 
     def load(self, fen):
         self.clear()
-        # Split data
+        
         fen = fen.split(' ')
-        # Expand blanks
-
         fen[0] = re.compile(r'\d').sub(lambda a: ' ' * int(a.group(0)), fen[0])
 
         for x, row in enumerate(fen[0].split('/')):
@@ -56,9 +57,6 @@ class Board(dict):
                     continue
                 coord = self.letter_notation((y, 7-x))
                 self[coord] = pieces.piece(letter, self)
-
-        # for k in self:
-        #     print("{} at {}".format(self[k].abbreviation, k))
 
         if fen[1] == 'w':
             self.player_turn = 'white'
@@ -87,14 +85,11 @@ class Board(dict):
         return str(self.encode_x(coord[0])) + str(self.encode_y(coord[1]))
 
     # from word to array indexes
-    def number_notation(self, coord):
+    def number_position(self, coord):
         return self.decode_x(coord[0]), self.decode_y(coord[1])
 
     def occupied(self, color):
-        # Return a list of coordinates occupied by `color`
         result = []
-        # if(color not in ("black", "white")): raise InvalidColor
-
         for coord in self:
             if self[coord].color == color:
                 result.append(coord)
@@ -110,6 +105,10 @@ class Board(dict):
 
     def get_king(self, color):
         return self[self.get_king_position(color)]
+
+    @staticmethod
+    def get_enemy(color):
+        return 'black' if color == 'white' else 'white'
 
     def is_in_check(self, color):
         king = self.get_king(color)
@@ -135,42 +134,6 @@ class Board(dict):
                     result += moves
         return result
 
-    def move(self, p1, p2):
-        piece = self[p1]
-        dest = self[p2]
-
-        # prevent player taking wrong turn
-        if self.player_turn != piece.color:
-            return
-            # raise NotYourTurn("Not " + piece.color + "'s turn!")
-
-        enemy = self.get_enemy(piece.color)
-        possible_moves = piece.possible_moves(p1)
-        # 0. Check if p2 is in the possible moves
-        if p2 not in possible_moves:
-            return
-            # raise InvalidMove
-
-        # If enemy has any moves look for check
-        if self.all_possible_moves(enemy):
-            if self.is_in_check_after_move(p1, p2):
-                return
-                # raise Check
-        elif not possible_moves:
-            self.is_end = True
-            return
-            # raise Draw
-
-        if not possible_moves and self.is_in_check(piece.color):
-            self.is_end = True
-            self.winner = self.get_enemy(piece.color)
-            print("{}, winner is: {}".format(self.is_end, self.winner))
-            return
-            # raise CheckMate
-        else:
-            self._do_move(p1, p2)
-            self._finish_move(piece, dest, p1, p2)
-
     '''
         Move a piece without validation
     '''
@@ -178,10 +141,6 @@ class Board(dict):
         piece = self[p1]
         del self[p1]
         self[p2] = piece
-
-    @staticmethod
-    def get_enemy(color):
-        return 'black' if color == 'white' else 'white'
 
     '''
         Set next player turn, count moves, log moves, etc.
@@ -193,16 +152,49 @@ class Board(dict):
         self.halfmove_clock += 1
         self.player_turn = enemy
         abbr = piece.abbreviation
-        if abbr == 'P':
-            # Pawn resets halfmove_clock
-            self.halfmove_clock = 0
-        if dest is None:
-            # No capturing
-            movetext = abbr + p2
-        else:
-            # Capturing
-            movetext = abbr + p2
-            # Capturing resets halfmove_clock
+        if abbr == 'P' or dest is not None:
             self.halfmove_clock = 0
 
-        self.history.append(movetext)
+        self.history.append(abbr + p2)
+    '''
+        if the enemy's king does not have a move
+        the game is over
+    '''
+    def _is_game_over(self, color):
+        if not self.is_in_check(color):
+            return
+        king_pos = self.get_king_position(color)
+        king = self.get_king(color)
+        king_possible_moves = king.possible_moves(king_pos)
+        enemy_possible_moves = self.all_possible_moves(self.get_enemy(color))
+        if set(king_possible_moves).issubset(enemy_possible_moves):
+            self.is_end = True
+            self.winner = self.get_enemy(color)
+
+    def move(self, p1, p2):
+        piece = self[p1]
+        dest = self[p2]
+
+        # await for player's turn
+        if self.player_turn != piece.color:
+            return
+            # raise NotYourTurn("Not " + piece.color + "'s turn!")
+
+        enemy = self.get_enemy(piece.color)
+        possible_moves = piece.possible_moves(p1)
+        # 0. Check if p2 is in the possible moves
+        if p2 not in possible_moves:
+            return
+            # raise InvalidMove
+
+        # Fault move prevention
+        if self.all_possible_moves(enemy):
+            if self.is_in_check_after_move(p1, p2):
+                return
+        elif not possible_moves:
+            self.is_end = True
+            return
+
+        self._do_move(p1, p2)
+        self._is_game_over(self.get_enemy(self.player_turn))
+        self._finish_move(piece, dest, p1, p2)
